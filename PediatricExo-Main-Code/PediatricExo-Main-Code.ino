@@ -1,10 +1,13 @@
 //Pediatric Exo Main code
 
-//TODO1: Define motros direction and number, confirm motor1=knee, motor2=hip
+//TODO1: Define motors direction and number, confirm motor1=knee, motor2=hip
 //TODO2: Include contact switches code, add pin numbers
 //TODO3: Add FSM code
-//TODO4: PID implementation
-//TODO5: Test joystick
+//TODO4: Test states individually
+//TODO5: Test PID for state transition
+//TODO6: Test gait cycle for each leg individually
+//TODO7: Test full FSM
+//TODO8: Test joystick
 
 //Declarations for Monster Drivers
 #define BRAKE 0
