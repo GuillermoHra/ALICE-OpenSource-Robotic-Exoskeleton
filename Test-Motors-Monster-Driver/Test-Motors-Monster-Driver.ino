@@ -1,5 +1,3 @@
-//TODO1: test current sensing
-//TODO2: test PWM effect in torque (current sensing)
 
 #define BRAKE 0
 #define CW    1
@@ -14,17 +12,17 @@
 #define MOTOR_A2_PIN 4
 #define MOTOR_B2_PIN 9
 
-#define PWM_MOTOR_1 5
-#define PWM_MOTOR_2 6
+#define PWM_MOTOR_KNEE 5
+#define PWM_MOTOR_HIP 6
 
-#define CURRENT_SEN_1 A2
-#define CURRENT_SEN_2 A3
+#define CURRENT_SEN_KNEE A2
+#define CURRENT_SEN_HIP A3
 
-#define EN_PIN_1 A0
-#define EN_PIN_2 A1
+#define EN_PIN_KNEE A0
+#define EN_PIN_HIP A1
 
-#define MOTOR_1 0
-#define MOTOR_2 1
+#define MOTOR_KNEE 0 //Knee
+#define MOTOR_HIP 1 //Hip
 
 short usSpeed = 150;  //default motor speed
 unsigned short usMotor_Status = BRAKE;
@@ -40,33 +38,33 @@ void setup()
   pinMode(MOTOR_A2_PIN, OUTPUT);
   pinMode(MOTOR_B2_PIN, OUTPUT);
 
-  pinMode(PWM_MOTOR_1, OUTPUT);
-  pinMode(PWM_MOTOR_2, OUTPUT);
+  pinMode(PWM_MOTOR_KNEE, OUTPUT);
+  pinMode(PWM_MOTOR_HIP, OUTPUT);
 
-  pinMode(CURRENT_SEN_1, OUTPUT);
-  pinMode(CURRENT_SEN_2, OUTPUT);  
+  pinMode(CURRENT_SEN_KNEE, OUTPUT);
+  pinMode(CURRENT_SEN_HIP, OUTPUT);  
 
-  pinMode(EN_PIN_1, OUTPUT);
-  pinMode(EN_PIN_2, OUTPUT);
+  pinMode(EN_PIN_KNEE, OUTPUT);
+  pinMode(EN_PIN_HIP, OUTPUT);
 
   Serial.begin(9600);     
   Serial.println("Motor control");
   Serial.println(); //Print function list for user selection
   Serial.println("Enter number to select motor:");
-  Serial.println("1. Motor1");
-  Serial.println("2. Motor2");
+  Serial.println("1. Motor Hip");
+  Serial.println("2. Motor Knee");
 
   while(serial == 0){
     serial = Serial.available();
   }
     select_motor = Serial.read();
     if(select_motor == '1'){
-      motor = MOTOR_1;
-      Serial.println("Motor1 selected");
+      motor = MOTOR_HIP; //Motor Knee
+      Serial.println("Motor Knee selected");
     }
     else if(select_motor == '2'){
-      motor = MOTOR_2;
-      Serial.println("Motor2 selected");
+      motor = MOTOR_KNEE; //Motor Hip
+      Serial.println("Motor Hip selected");
     }
     else{
       Serial.println("Invalid option entered for motor selection.");
@@ -86,8 +84,8 @@ void setup()
 void loop() 
 {
   char user_input;   
-  digitalWrite(EN_PIN_1, HIGH); //Enable Motor1
-  digitalWrite(EN_PIN_2, HIGH); //Enable Motor2
+  digitalWrite(EN_PIN_KNEE, HIGH); //Enable MOTOR KNEE
+  digitalWrite(EN_PIN_HIP, HIGH); //Enable MOTOR HIP
   
     while(Serial.available()){    
       user_input = Serial.read(); //Read user input 
@@ -98,13 +96,13 @@ void loop()
       else if(user_input =='2')
       {
         Forward(motor);
-        delay(50);
+        delay(75);
         Stop(motor);
       }
       else if(user_input =='3')
       {
         Reverse(motor);
-        delay(50);
+        delay(75);
         Stop(motor);
       }
       else if(user_input =='+')
@@ -132,14 +130,14 @@ void Stop(int motor)
 void Forward(int motor)
 {
   Serial.println("Forward");
-  usMotor_Status = CW;
+  usMotor_Status = CCW;
   motorGo(motor, usMotor_Status, usSpeed);
 }
 
 void Reverse(int motor)
 {
   Serial.println("Reverse");
-  usMotor_Status = CCW;
+  usMotor_Status = CW;
   motorGo(motor, usMotor_Status, usSpeed);
 }
 
@@ -169,7 +167,7 @@ void DecreaseSpeed()
 
 void motorGo(uint8_t motor, uint8_t direct, uint8_t pwm)         //Function that controls the variables: motor(0 or 1), direction (cw or ccw) and pwm (0 - 255);
 {
-  if(motor == MOTOR_1)
+  if(motor == MOTOR_KNEE)
   {
     if(direct == CW)
     {
@@ -187,9 +185,9 @@ void motorGo(uint8_t motor, uint8_t direct, uint8_t pwm)         //Function that
       digitalWrite(MOTOR_B1_PIN, LOW);            
     }
     
-    analogWrite(PWM_MOTOR_1, pwm); 
+    analogWrite(PWM_MOTOR_KNEE, pwm); 
   }
-  else if(motor == MOTOR_2)
+  else if(motor == MOTOR_HIP)
   {
     if(direct == CW)
     {
@@ -207,7 +205,7 @@ void motorGo(uint8_t motor, uint8_t direct, uint8_t pwm)         //Function that
       digitalWrite(MOTOR_B2_PIN, LOW);            
     }
     
-    analogWrite(PWM_MOTOR_2, pwm);
+    analogWrite(PWM_MOTOR_HIP, pwm);
   }
 }
 
