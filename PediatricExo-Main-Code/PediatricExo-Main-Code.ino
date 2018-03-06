@@ -8,6 +8,7 @@
 //TODO6: Test gait cycle for each leg individually
 //TODO7: Test full FSM
 //TODO8: Test joystick
+#include <PID_v1.h>
 
 //Declarations for Monster Drivers
 #define BRAKE 0
