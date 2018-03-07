@@ -1,13 +1,14 @@
 //Pediatric Exo Main code
 
 //TODO1: Define motors direction and number (Done)
-//TODO2: Include contact switches code, add pin numbers (Partially done)
-//TODO3: Add FSM code
-//TODO4: Test states individually
-//TODO5: Test PID for state transition
+//TODO2: Include contact switches code, add pin numbers (Done)
+//TODO3: Test states individually
+//TODO4: Test PID for state transition
+//TODO5: Add FSM code
 //TODO6: Test gait cycle for each leg individually
 //TODO7: Test full FSM
 //TODO8: Test joystick
+//TODO9: Check Motor direction in other leg (They are mechanically inverted)
 #include <PID_v1.h>
 
 //Declarations for Monster Drivers
@@ -29,7 +30,7 @@
 #define EN_PIN_HIP A1
 #define MOTOR_KNEE 0 //Motor Knee
 #define MOTOR_HIP 1 //Motor Hip
-short usSpeed = 50;  //default motor speed = 150
+short usSpeed = 100;  //default motor speed = 150
 unsigned short usMotor_Status = BRAKE;
 char select_motor;
 uint8_t motor = 0;
@@ -38,8 +39,8 @@ int serial = 0;
 //Declarations for switches
 #define SWITCH_KNEE_BACK 21 
 #define SWITCH_KNEE_FRONT 20
-#define SWITCH_HIP_BACK
-#define SWITCH_HIP_BACK 
+#define SWITCH_HIP_BACK 19
+#define SWITCH_HIP_BACK 18
 
 void setup() {
   //pinMode for monster drivers
@@ -78,9 +79,12 @@ void loop() {
   //MIDSTANCE to PRE-SWING
   while((digitalRead(SWITCH_KNEE_BACK) == 1) && (digitalRead(SWITCH_KNEE_FRONT) == 1)){
     Forward(MOTOR_KNEE);
+    
   }
   if(digitalRead(SWITCH_KNEE_FRONT) == 0){
-      while((digitalRead(SWITCH_KNEE_BACK) == 1) && (digitalRead(SWITCH_KNEE_FRONT) == 0)){
+      Reverse(MOTOR_KNEE);
+      delay(75); //Time for the switch to change state to 1
+      while((digitalRead(SWITCH_KNEE_BACK) == 1) && (digitalRead(SWITCH_KNEE_FRONT) == 1)){
         Reverse(MOTOR_KNEE);
       }
   }
