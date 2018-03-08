@@ -30,17 +30,17 @@
 #define EN_PIN_HIP A1
 #define MOTOR_KNEE 0 //Motor Knee
 #define MOTOR_HIP 1 //Motor Hip
-short usSpeed = 100;  //default motor speed = 150
+//short usSpeed;  //default motor speed = 150
 unsigned short usMotor_Status = BRAKE;
 char select_motor;
 uint8_t motor = 0;
 int serial = 0;
 
 //Declarations for switches
-#define SWITCH_KNEE_BACK 21 
-#define SWITCH_KNEE_FRONT 20
+#define SWITCH_KNEE_BACK 20 
+#define SWITCH_KNEE_FRONT 21
 #define SWITCH_HIP_BACK 19
-#define SWITCH_HIP_BACK 18
+#define SWITCH_HIP_FRONT 18
 
 void setup() {
   //pinMode for monster drivers
@@ -78,34 +78,47 @@ void loop() {
 
   //MIDSTANCE to PRE-SWING
   while((digitalRead(SWITCH_KNEE_BACK) == 1) && (digitalRead(SWITCH_KNEE_FRONT) == 1)){
-    Forward(MOTOR_KNEE);
-    
+    Forward(MOTOR_KNEE, 80);
   }
-  if(digitalRead(SWITCH_KNEE_FRONT) == 0){
-      Reverse(MOTOR_KNEE);
+  if((digitalRead(SWITCH_KNEE_FRONT) == 0) && (digitalRead(SWITCH_KNEE_BACK) == 1)){
+      Reverse(MOTOR_KNEE, 150);
       delay(75); //Time for the switch to change state to 1
       while((digitalRead(SWITCH_KNEE_BACK) == 1) && (digitalRead(SWITCH_KNEE_FRONT) == 1)){
-        Reverse(MOTOR_KNEE);
+        Reverse(MOTOR_KNEE, 80);
       }
   }
-  if(digitalRead(SWITCH_KNEE_BACK) == 0){
-    Forward(MOTOR_KNEE);
-    delay(75);
+  if((digitalRead(SWITCH_KNEE_BACK) == 0) && (digitalRead(SWITCH_KNEE_FRONT) == 1)){
+    Stop(MOTOR_KNEE);
+    delay(100);
   }
     
-//  //PRE-SWING to MID-SWING
-//  while(digitalRead(SWITCH_HIP_FRONT != 0)){ //
-//    Forward(MOTOR_HIP);
-//  }
-//  stop(MOTOR_HIP);
-//  //MID-SWITN to TERMINAL-SWING
-//  while(digitalRead(SWITCH_KNEE_FRONT != 0)){ //
-//    Forward(MOTOR_KNEE);
-//  }
-//  //TERMINAL-SWING to MIDSTANCE
-//  while(digitalRead(SWITCH_HIP_BACK != 0)){ //
-//    Reverse(MOTOR_HIP);
-//  }
+  //PRE-SWING to MID-SWING
+  while((digitalRead(SWITCH_HIP_FRONT) == 1) && (digitalRead(SWITCH_HIP_BACK) == 0)){ //
+    Forward(MOTOR_HIP, 150);
+  }
+  if((digitalRead(SWITCH_HIP_BACK) == 1) && (digitalRead(SWITCH_HIP_FRONT) == 0)){
+    Stop(MOTOR_HIP); 
+    delay(100);
+  }
+  
+  //MID-SWING to TERMINAL-SWING
+  while((digitalRead(SWITCH_KNEE_BACK) == 0) && (digitalRead(SWITCH_KNEE_FRONT) == 1)){ //
+    Forward(MOTOR_KNEE, 80);
+  }
+  if((digitalRead(SWITCH_KNEE_FRONT) == 0) && (digitalRead(SWITCH_KNEE_BACK) == 1)){
+    Stop(MOTOR_KNEE);
+    delay(100);
+  }
+  
+  //TERMINAL-SWING to MIDSTANCE
+  while((digitalRead(SWITCH_HIP_BACK) == 1) && (digitalRead(SWITCH_HIP_FRONT) == 0)){ //
+    Reverse(MOTOR_HIP, 80);
+  }
+  if(digitalRead(SWITCH_HIP_FRONT) == 1 && digitalRead(SWITCH_HIP_BACK) == 0){
+    Stop(MOTOR_HIP);
+    delay(100);
+  }
+  Serial.println("FSM Done");
   
 }
 
@@ -117,43 +130,43 @@ void Stop(int motor)
   motorGo(motor, usMotor_Status, 0);
 }
 
-void Forward(int motor)
+void Forward(int motor, short usSpeed)
 {
   Serial.println("Forward");
   usMotor_Status = CCW;
   motorGo(motor, usMotor_Status, usSpeed);
 }
 
-void Reverse(int motor)
+void Reverse(int motor, short usSpeed)
 {
   Serial.println("Reverse");
   usMotor_Status = CW;
   motorGo(motor, usMotor_Status, usSpeed);
 }
 
-void IncreaseSpeed()
-{
-  usSpeed = usSpeed + 10;
-  if(usSpeed > 255)
-  {
-    usSpeed = 255;  
-  }
-  
-  Serial.print("Speed +: ");
-  Serial.println(usSpeed);
-}
-
-void DecreaseSpeed()
-{
-  usSpeed = usSpeed - 10;
-  if(usSpeed < 0)
-  {
-    usSpeed = 0;  
-  }
-  
-  Serial.print("Speed -: ");
-  Serial.println(usSpeed);
-}
+//void IncreaseSpeed()
+//{
+//  usSpeed = usSpeed + 10;
+//  if(usSpeed > 255)
+//  {
+//    usSpeed = 255;  
+//  }
+//  
+//  Serial.print("Speed +: ");
+//  Serial.println(usSpeed);
+//}
+//
+//void DecreaseSpeed()
+//{
+//  usSpeed = usSpeed - 10;
+//  if(usSpeed < 0)
+//  {
+//    usSpeed = 0;  
+//  }
+//  
+//  Serial.print("Speed -: ");
+//  Serial.println(usSpeed);
+//}
 
 void motorGo(uint8_t motor, uint8_t direct, uint8_t pwm) //Function that controls the variables: motor(0 or 1), direction (cw or ccw) and pwm (0 - 255);
 {

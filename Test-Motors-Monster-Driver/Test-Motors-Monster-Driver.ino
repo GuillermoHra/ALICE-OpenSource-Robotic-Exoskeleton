@@ -59,12 +59,12 @@ void setup()
   }
     select_motor = Serial.read();
     if(select_motor == '1'){
-      motor = MOTOR_HIP; //Motor Knee
-      Serial.println("Motor Knee selected");
+      motor = MOTOR_HIP; //Motor Hip
+      Serial.println("Motor hip selected");
     }
     else if(select_motor == '2'){
-      motor = MOTOR_KNEE; //Motor Hip
-      Serial.println("Motor Hip selected");
+      motor = MOTOR_KNEE; //Motor Knee
+      Serial.println("Motor knee selected");
     }
     else{
       Serial.println("Invalid option entered for motor selection.");
