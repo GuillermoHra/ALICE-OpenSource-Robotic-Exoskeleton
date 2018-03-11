@@ -39,6 +39,7 @@ int serial = 0;
 //Declarations for switches
 #define SWITCH_KNEE_BACK 20 
 #define SWITCH_KNEE_FRONT 21
+
 #define SWITCH_HIP_BACK 19
 #define SWITCH_HIP_FRONT 18
 
@@ -75,6 +76,9 @@ void loop() {
   MID-SWING
   TERMINAL-SWING
   */
+  delay(10000);
+  Serial.println("Get ready");
+  delay(3000);
 
   //MIDSTANCE to PRE-SWING
   while((digitalRead(SWITCH_KNEE_BACK) == 1) && (digitalRead(SWITCH_KNEE_FRONT) == 1)){
@@ -89,7 +93,8 @@ void loop() {
   }
   if((digitalRead(SWITCH_KNEE_BACK) == 0) && (digitalRead(SWITCH_KNEE_FRONT) == 1)){
     Stop(MOTOR_KNEE);
-    delay(100);
+    Serial.println("Done MIDSTANCE to PRESWING");
+    delay(1000);
   }
     
   //PRE-SWING to MID-SWING
@@ -98,27 +103,33 @@ void loop() {
   }
   if((digitalRead(SWITCH_HIP_BACK) == 1) && (digitalRead(SWITCH_HIP_FRONT) == 0)){
     Stop(MOTOR_HIP); 
-    delay(100);
+    Serial.println("Done PRESWING to MIDSWING");
+    delay(1000);
   }
   
   //MID-SWING to TERMINAL-SWING
   while((digitalRead(SWITCH_KNEE_BACK) == 0) && (digitalRead(SWITCH_KNEE_FRONT) == 1)){ //
     Forward(MOTOR_KNEE, 80);
   }
+  //Enough time to change state?
   if((digitalRead(SWITCH_KNEE_FRONT) == 0) && (digitalRead(SWITCH_KNEE_BACK) == 1)){
     Stop(MOTOR_KNEE);
-    delay(100);
+    Serial.println("Done MIDSWING to TERMINAL-SWING");
+    delay(1000);
   }
   
   //TERMINAL-SWING to MIDSTANCE
   while((digitalRead(SWITCH_HIP_BACK) == 1) && (digitalRead(SWITCH_HIP_FRONT) == 0)){ //
-    Reverse(MOTOR_HIP, 80);
+    Reverse(MOTOR_HIP, 90);
   }
+  //Enough time to change state?
   if(digitalRead(SWITCH_HIP_FRONT) == 1 && digitalRead(SWITCH_HIP_BACK) == 0){
     Stop(MOTOR_HIP);
-    delay(100);
+    Serial.println("Done TERMINAL SIWNG to MIDSTANCE");
+    delay(1000);
   }
   Serial.println("FSM Done");
+  delay(10000);
   
 }
 
@@ -132,14 +143,12 @@ void Stop(int motor)
 
 void Forward(int motor, short usSpeed)
 {
-  Serial.println("Forward");
   usMotor_Status = CCW;
   motorGo(motor, usMotor_Status, usSpeed);
 }
 
 void Reverse(int motor, short usSpeed)
 {
-  Serial.println("Reverse");
   usMotor_Status = CW;
   motorGo(motor, usMotor_Status, usSpeed);
 }
