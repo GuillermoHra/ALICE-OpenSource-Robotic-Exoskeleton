@@ -1,9 +1,12 @@
 //Switch test
+int potVal;
+int angle;
 
 void setup() {
   Serial.begin(9600);
   pinMode(21, INPUT); //Knee back
-  pinMode(20, INPUT); //Knee fron
+  pinMode(20, INPUT); //Knee front
+  pinMode(A14, INPUT); //Pot
 }
 
 void loop() {
@@ -11,12 +14,14 @@ void loop() {
   //Change state when digital read is '0' (switch pressed)
   //Connection: Left(digital pind and Vcc w/10 kohm resistor-pull up), middle(GND)
 
-  Serial.print("State Front: ");
-  Serial.println(digitalRead(20));
-  delay(500);
+  Serial.print("Pot: ");
+  Serial.println(analogRead(A14));
+  //Serial.print("Angle: ");
+  //pot_Val = analogRead(A14));
+  //angle = map(pot_Val, 0, 1023, 3, 100);
+  //Serial.println(angle);
+
   
-  Serial.print("State Back: ");
-  Serial.println(digitalRead(21));
   delay(500);
 
 }

@@ -32,6 +32,10 @@ int serial = 0;
  
 void setup()                         
 {
+
+  //
+    pinMode(A14, INPUT); //Pot
+  //
   pinMode(MOTOR_A1_PIN, OUTPUT);
   pinMode(MOTOR_B1_PIN, OUTPUT);
 
@@ -94,16 +98,22 @@ void loop()
          Stop(motor);
       }
       else if(user_input =='2')
+     
       {
         Forward(motor);
         delay(75);
         Stop(motor);
+        Serial.println(analogRead(A14));
+        delay(500);
       }
       else if(user_input =='3')
       {
         Reverse(motor);
         delay(75);
         Stop(motor);
+        Serial.println(analogRead(A14));
+        
+        delay(500);
       }
       else if(user_input =='+')
       {
