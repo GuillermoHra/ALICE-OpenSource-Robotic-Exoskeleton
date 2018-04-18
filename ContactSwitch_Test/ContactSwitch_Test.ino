@@ -20,8 +20,6 @@ void loop() {
   //pot_Val = analogRead(A14));
   //angle = map(pot_Val, 0, 1023, 3, 100);
   //Serial.println(angle);
-
-  
   delay(500);
 
 }

@@ -9,6 +9,7 @@
 //TODO7: Test full FSM
 //TODO8: Test joystick
 //TODO9: Check Motor direction in other leg (They are mechanically inverted)
+//Be aware of loss of absolute reference position (save values to restore them later)
 #include <PID_v1.h>
 
 //Declarations for Monster Drivers

@@ -112,7 +112,6 @@ void loop()
         delay(75);
         Stop(motor);
         Serial.println(analogRead(A14));
-        
         delay(500);
       }
       else if(user_input =='+')
