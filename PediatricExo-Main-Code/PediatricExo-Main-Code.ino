@@ -1,26 +1,26 @@
-//Pediatric Exo Main code
+// Pediatric Exo Main code
 
-//TODO1: Define motors direction and number (Done)
-//TODO2: Include contact switches code, add pin numbers (Done)
-//TODO3: Test states individually
-//TODO4: Test PID for state transition
-//TODO5: Add FSM code
-//TODO6: Test gait cycle for each leg individually
-//TODO7: Test full FSM
-//TODO8: Test joystick
-//TODO9: Check Motor direction in other leg (They are mechanically inverted)
-//Be aware of loss of absolute reference position (save values to restore them later)
+// TODO1: Define motors direction
+// TODO2: FSM code (Working on)
+// TODO3: Test gait cycle for each leg individually (put attention on the speed)
+// TODO4: Test PID for state transition (speed)
+// TODO5: Test full FSM (Both legs)
+// TODO6: Test joystick
+// TODO7: Check Motor direction in other leg (They are mechanically inverted)
+// Be aware of loss of absolute reference position (save values to restore them later)
+// Remove delay after Serialprints when testing is done
+
 #include <PID_v1.h>
 
-//Declarations for Monster Drivers
+// Declarations for Monster Drivers
 #define BRAKE 0
 #define CW    1
 #define CCW   2
-#define CS_THRESHOLD 15   // Definition of safety current (Check: "1.3 Monster Shield Example").
-//MOTOR 1
+#define CS_THRESHOLD 15   // Definition of safety current
+// MOTOR 1
 #define MOTOR_A1_PIN 7
 #define MOTOR_B1_PIN 8
-//MOTOR 2
+// MOTOR 2
 #define MOTOR_A2_PIN 4
 #define MOTOR_B2_PIN 9
 #define PWM_MOTOR_KNEE 5
@@ -29,23 +29,20 @@
 #define CURRENT_SEN_HIP A3
 #define EN_PIN_KNEE A0
 #define EN_PIN_HIP A1
-#define MOTOR_KNEE 0 //Motor Knee
-#define MOTOR_HIP 1 //Motor Hip
-//short usSpeed;  //default motor speed = 150
+#define MOTOR_KNEE 0  // Motor Knee
+#define MOTOR_HIP 1  // Motor Hip
+//short usSpeed;     // default motor speed = 150
 unsigned short usMotor_Status = BRAKE;
 char select_motor;
 uint8_t motor = 0;
 int serial = 0;
 
-//Declarations for switches
-#define SWITCH_KNEE_BACK 20 
-#define SWITCH_KNEE_FRONT 21
-
-#define SWITCH_HIP_BACK 19
-#define SWITCH_HIP_FRONT 18
+// Declarations for potentiometers
+#define POT_HIP A13 // Pot analog pin for right hip 
+#define POT_KNEE A14 // Pot analog pin for right knee
 
 void setup() {
-  //pinMode for monster drivers
+  // pinMode for monster drivers
   pinMode(MOTOR_A1_PIN, OUTPUT);
   pinMode(MOTOR_B1_PIN, OUTPUT);
   pinMode(MOTOR_A2_PIN, OUTPUT);
@@ -57,84 +54,146 @@ void setup() {
   pinMode(EN_PIN_KNEE, OUTPUT);
   pinMode(EN_PIN_HIP, OUTPUT);
 
-  //pinMode for switches
-  pinMode(SWITCH_KNEE_BACK, INPUT); 
-  pinMode(SWITCH_KNEE_FRONT, INPUT); 
+  // pinMode for potentiometers
+  pinMode(POT_HIP, INPUT); 
+  pinMode(POT_KNEE, INPUT); 
 
   Serial.begin(9600);     
   
 }
 
 void loop() {
-  digitalWrite(EN_PIN_KNEE, HIGH); //Enable Motor1
-  digitalWrite(EN_PIN_HIP, HIGH); //Enable Motor2
-
-  //Contact switch: Change state when digital read is '0' (switch pressed)
+  digitalWrite(EN_PIN_KNEE, HIGH); // Enable Motor1
+  digitalWrite(EN_PIN_HIP, HIGH); // Enable Motor2
 
   /* FSM
-  MIDSTANCE:
+  MIDSTANCE
   PRE-SWING
   MID-SWING
   TERMINAL-SWING
+ 
+  Right hip: (30° - (470-505)), (-10° - (598-608)), (15° - (514-526)), (0° - (560-569)) Valor disminuye(ángulo aumenta), Valor aumenta(ángulo disminuye)
+  Right knee: (-60° - (385-395)), (0° - (611-616)), (-30° - (478-485)) Valor disminuye(ángulo disminuye), Valor aumenta(ángulo aumenta)
+   
+  Left hip: (30° - (527-542)), (-10° - (595-605)), (15° - ()), (0° - ())
+  Left knee: (-60° - (601-607)), (0° - (474-481)), (-30° - ()) For left knee 0° are 15° due to mechanical failure
   */
+  
   delay(10000);
   Serial.println("Get ready");
   delay(3000);
 
-  //MIDSTANCE to PRE-SWING
-  while((digitalRead(SWITCH_KNEE_BACK) == 1) && (digitalRead(SWITCH_KNEE_FRONT) == 1)){
-    Forward(MOTOR_KNEE, 80);
-  }
-  if((digitalRead(SWITCH_KNEE_FRONT) == 0) && (digitalRead(SWITCH_KNEE_BACK) == 1)){
-      Reverse(MOTOR_KNEE, 150);
-      delay(75); //Time for the switch to change state to 1
-      while((digitalRead(SWITCH_KNEE_BACK) == 1) && (digitalRead(SWITCH_KNEE_FRONT) == 1)){
-        Reverse(MOTOR_KNEE, 80);
+  // Hip and Knee to 0°
+  Serial.println("Hip and Knee to 0°");
+  delay(1000);
+  while((analogRead(POT_HIP) < 560) || (analogRead(POT_HIP) > 569)){
+    if (analogRead(POT_HIP) < 560){
+      // Move reverse
+      while(analogRead(POT_HIP) < 560){
+        Reverse(MOTOR_HIP, 65);
+        delay(50);
       }
+      Stop(MOTOR_HIP);
+      
+    }
+    delay(200);
+    if (analogRead(POT_HIP) > 569){
+      // Move forward
+      while(analogRead(POT_HIP) > 569){
+        Forward(MOTOR_HIP, 65);
+        delay(50);
+      }
+      Stop(MOTOR_HIP);
+    }
+    delay(200);
   }
-  if((digitalRead(SWITCH_KNEE_BACK) == 0) && (digitalRead(SWITCH_KNEE_FRONT) == 1)){
-    Stop(MOTOR_KNEE);
-    Serial.println("Done MIDSTANCE to PRESWING");
-    delay(1000);
+
+  while((analogRead(POT_KNEE) < 611) || (analogRead(POT_KNEE) > 616)){
+    if (analogRead(POT_KNEE) < 611){
+      // Move forward
+      while(analogRead(POT_KNEE) < 611){
+        Forward(MOTOR_KNEE, 65);
+        delay(50);
+      }
+      Stop(MOTOR_KNEE);
+    }
+    delay(200);
+    if (analogRead(POT_KNEE) > 616){
+      // Move reverse
+      while(analogRead(POT_KNEE) > 616){
+        Reverse(MOTOR_KNEE, 65);
+        delay(50);
+      }
+      Stop(MOTOR_KNEE);
+    }
+    delay(200); 
   }
+  Serial.println("Hip and Knee to 0° done");
+  delay(1000); 
+
+  // INITIAL SWING: HIP:0°, KNEE:0->(-60°)
+  Serial.println("Initial Swing");
+  delay(1000);
+  while(analogRead(POT_KNEE) > 390){
+    Reverse(MOTOR_KNEE, 65);
+    delay(50);
+    // PID: Reduce speed when approaching the specified angle 
+  }
+  Stop(MOTOR_KNEE);
+  delay(750);
     
-  //PRE-SWING to MID-SWING
-  while((digitalRead(SWITCH_HIP_FRONT) == 1) && (digitalRead(SWITCH_HIP_BACK) == 0)){ //
-    Forward(MOTOR_HIP, 150);
+  // MID-SWING: HIP:0->15°, KNEE:(-60°)->(-30°)
+  while(analogRead(POT_HIP) > 545){
+    Forward(MOTOR_HIP, 65);
+    delay(50);
   }
-  if((digitalRead(SWITCH_HIP_BACK) == 1) && (digitalRead(SWITCH_HIP_FRONT) == 0)){
-    Stop(MOTOR_HIP); 
-    Serial.println("Done PRESWING to MIDSWING");
-    delay(1000);
+  Stop(MOTOR_HIP);
+  delay(750);
+  while(analogRead(POT_KNEE) < 480){
+    Forward(MOTOR_KNEE, 65);
+    delay(50);
   }
+  Stop(MOTOR_KNEE);
+  delay(750);
+  Serial.println("Initial Swing done");
+  delay(1000);    
   
-  //MID-SWING to TERMINAL-SWING
-  while((digitalRead(SWITCH_KNEE_BACK) == 0) && (digitalRead(SWITCH_KNEE_FRONT) == 1)){ //
-    Forward(MOTOR_KNEE, 80);
+  // TERMINAL SWING: HIP:15°->30°, KNEE:(-30°)->0°
+  Serial.println("Terminal Swing");
+  delay(1000);
+  while((analogRead(POT_KNEE) < 612)){
+    Forward(MOTOR_KNEE, 65);
+    delay(50);
   }
-  //Enough time to change state?
-  if((digitalRead(SWITCH_KNEE_FRONT) == 0) && (digitalRead(SWITCH_KNEE_BACK) == 1)){
-    Stop(MOTOR_KNEE);
-    Serial.println("Done MIDSWING to TERMINAL-SWING");
-    delay(1000);
+  Stop(MOTOR_KNEE);
+  delay(750);
+  while(analogRead(POT_HIP) > 520){
+    Forward(MOTOR_HIP, 65);
+    delay(50);
   }
+  Stop(MOTOR_HIP);
+  delay(750);
+  Serial.println("Terminal Swing done");
+  delay(1000);
   
-  //TERMINAL-SWING to MIDSTANCE
-  while((digitalRead(SWITCH_HIP_BACK) == 1) && (digitalRead(SWITCH_HIP_FRONT) == 0)){ //
-    Reverse(MOTOR_HIP, 90);
+  // MID-STANCE: HIP:30°->0°, KNEE:0°
+  Serial.println("Mid-Stance");
+  delay(1000);
+  while(analogRead(POT_HIP) < 565){
+    Reverse(MOTOR_HIP, 35);
+    delay(50);
   }
-  //Enough time to change state?
-  if(digitalRead(SWITCH_HIP_FRONT) == 1 && digitalRead(SWITCH_HIP_BACK) == 0){
-    Stop(MOTOR_HIP);
-    Serial.println("Done TERMINAL SIWNG to MIDSTANCE");
-    delay(1000);
-  }
-  Serial.println("FSM Done");
+  // Amortiguar
+  Stop(MOTOR_HIP);
+  delay(750);
+  Serial.println("Mid-Stance done");
+  delay(1000);
+
+  Serial.println("FSM Done, you have 10 seconds to stop the execution");
   delay(10000);
-  
 }
 
-//Functions
+// Functions
 void Stop(int motor)
 {
   Serial.println("Stop");
@@ -178,7 +237,7 @@ void Reverse(int motor, short usSpeed)
 //  Serial.println(usSpeed);
 //}
 
-void motorGo(uint8_t motor, uint8_t direct, uint8_t pwm) //Function that controls the variables: motor(0 or 1), direction (cw or ccw) and pwm (0 - 255);
+void motorGo(uint8_t motor, uint8_t direct, uint8_t pwm) // Function that controls the variables: motor(0 or 1), direction (cw or ccw) and pwm (0 - 255);
 {
   if(motor == MOTOR_KNEE)
   {
