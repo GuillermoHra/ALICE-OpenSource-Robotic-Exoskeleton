@@ -1,0 +1,318 @@
+#define BRAKE 0
+#define CW    1
+#define CCW   2
+#define CS_THRESHOLD 15   // Definition of safety current (Check: "1.3 Monster Shield Example").
+
+//MOTOR 1
+#define MOTOR_A1_PIN 7
+#define MOTOR_B1_PIN 8
+
+//MOTOR 2
+#define MOTOR_A2_PIN 4
+#define MOTOR_B2_PIN 9
+
+#define PWM_MOTOR_KNEE 5
+#define PWM_MOTOR_HIP 6
+
+#define CURRENT_SEN_KNEE A2
+#define CURRENT_SEN_HIP A3
+
+#define EN_PIN_KNEE A0
+#define EN_PIN_HIP A1
+
+#define MOTOR_KNEE 0 //Knee
+#define MOTOR_HIP 1 //Hip
+
+short usSpeed = 150;  //default motor speed
+unsigned short usMotor_Status = BRAKE;
+char select_motor;
+uint8_t motor = 0;
+int serial = 0;
+int delayE = 25;
+int AnalogChannel = 13;
+bool calibrated = true;
+int knee_0degrees=612;
+int hip_0degrees=565;
+char user_input; 
+
+
+//----PID------///////////////
+double Setpoint;
+double Input;
+double Output;
+double Kp=0, Ki=10, Kd=0;
+////////////////
+
+//create PID instance 
+PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
+
+
+void setup()                         
+{
+
+  //
+    pinMode(A13, INPUT); //Pot hip
+    pinMode(A14, INPUT); //Pot knee
+  //
+  pinMode(MOTOR_A1_PIN, OUTPUT);
+  pinMode(MOTOR_B1_PIN, OUTPUT);
+
+  pinMode(MOTOR_A2_PIN, OUTPUT);
+  pinMode(MOTOR_B2_PIN, OUTPUT);
+
+  pinMode(PWM_MOTOR_KNEE, OUTPUT);
+  pinMode(PWM_MOTOR_HIP, OUTPUT);
+
+  pinMode(CURRENT_SEN_KNEE, OUTPUT);
+  pinMode(CURRENT_SEN_HIP, OUTPUT);  
+
+  pinMode(EN_PIN_KNEE, OUTPUT);
+  pinMode(EN_PIN_HIP, OUTPUT);
+
+  //PID
+  //Initial setpoint
+  Setpoint = 75;
+  //Turn the PID on
+  myPID.SetMode(AUTOMATIC);
+  //Adjust PID values
+  myPID.SetTunings(Kp, Ki, Kd);
+  
+  Serial.begin(9600);     
+  Serial.println("Motor control");
+  Serial.println(); //Print function list for user selection
+  Serial.println("Enter number to select motor:");
+  Serial.println("1. Motor Hip");
+  Serial.println("2. Motor Knee");
+
+  while(serial == 0){
+    serial = Serial.available();
+  }
+    select_motor = Serial.read();
+    if(select_motor == '1'){
+      motor = MOTOR_HIP; //Motor Hip
+      AnalogChannel = 13;
+      Serial.println("Motor hip selected");
+    }
+    else if(select_motor == '2'){
+      motor = MOTOR_KNEE; //Motor Knee
+      AnalogChannel = 14;
+      Serial.println("Motor knee selected");
+    }
+    else{
+      Serial.println("Invalid option entered for motor selection.");
+    }
+   
+  DisplayMenu();
+}
+
+void loop() 
+{
+  
+  digitalWrite(EN_PIN_KNEE, HIGH); //Enable MOTOR KNEE
+  digitalWrite(EN_PIN_HIP, HIGH); //Enable MOTOR HIP
+  while(Serial.available())
+  {
+    MenuFunctions();
+  }  
+}
+
+void DisplayMenu()
+{   //////////////////////////////////////////////////
+  Serial.println("Enter number for control option:");
+  Serial.println("0. CALIBRATION");
+  Serial.println("1. STOP");
+  Serial.println("2. FORWARD");
+  Serial.println("3. REVERSE");
+  Serial.println("4. ANDALOG READ");
+  Serial.println("5. INCREASE DELAY");
+  Serial.println("6. DECREASE DELAY");
+  Serial.println("+. INCREASE SPEED");
+  Serial.println("-. DECREASE SPEED");
+  
+  Serial.println();
+}
+
+void MenuFunctions()
+{        
+      user_input = Serial.read(); //Read user input 
+      if (user_input =='0' && calibrated==true)
+      {
+         Serial.println("Entering the calibration routine");
+         CalibrationRoutine();
+      }
+      else if (user_input =='1')
+      {
+         Stop(motor);
+      }
+      else if(user_input =='2')
+      {
+        Forward(motor);
+        delay(delayE);
+        Stop(motor);
+        //Serial.println("F");
+        delay(50);
+        Serial.println(analogRead(AnalogChannel));
+        
+        delay(50);
+        
+      }
+      else if(user_input =='3')
+      {
+        Reverse(motor);
+        delay(delayE);
+        Stop(motor);
+        //Serial.println("R");
+        delay(50);
+        Serial.println(analogRead(AnalogChannel));
+        
+        delay(50);
+      }
+      else if(user_input =='4')
+      {
+        Serial.println(analogRead(AnalogChannel));
+        delay(500);
+      }
+      else if(user_input =='5')
+      {
+        delayE=delayE+5;
+        Serial.println(delayE);
+      }
+      else if(user_input =='6')
+      {
+        delayE=delayE-5;
+        Serial.println(delayE);
+      }
+      else if(user_input =='7')
+      {
+        calibrated = true;
+      }
+      else if(user_input =='8')
+      {
+        Serial.println('Knee');
+        Serial.println(knee_0degrees);
+        Serial.println('Hip');
+        Serial.println(hip_0degrees);
+      }
+      else if(user_input =='+')
+      {
+        IncreaseSpeed();
+      }
+      else if(user_input =='-')
+      {
+        DecreaseSpeed();
+      }
+      else
+      {
+        Serial.println("Invalid option entered.");
+      }
+    
+}
+void CalibrationRoutine()
+{
+   calibrated=false;
+   DisplayMenu();
+   Serial.println("Press 7 when the calibration is done");
+   while (calibrated==false)
+   {
+     if(Serial.available())
+     {
+       MenuFunctions();
+     }
+     
+   }
+   if(select_motor == '1'){ //Motor Hip
+      hip_0degrees = analogRead(AnalogChannel);
+   }
+   else if(select_motor == '2'){ //Motor Knee
+      knee_0degrees = analogRead(AnalogChannel);
+   }
+  
+}
+void Stop(int motor)
+{
+  //Serial.println("Stop");
+  usMotor_Status = BRAKE;
+  motorGo(motor, usMotor_Status, 0);
+}
+
+void Forward(int motor)
+{
+  //Serial.println("Forward");
+  usMotor_Status = CCW;
+  motorGo(motor, usMotor_Status, usSpeed);
+}
+
+void Reverse(int motor)
+{
+  //Serial.println("Reverse");
+  usMotor_Status = CW;
+  motorGo(motor, usMotor_Status, usSpeed);
+}
+
+void IncreaseSpeed()
+{
+  usSpeed = usSpeed + 10;
+  if(usSpeed > 255)
+  {
+    usSpeed = 255;  
+  }
+  
+  Serial.print("Speed +: ");
+  Serial.println(usSpeed);
+}
+
+void DecreaseSpeed()
+{
+  usSpeed = usSpeed - 10;
+  if(usSpeed < 0)
+  {
+    usSpeed = 0;  
+  }
+  
+  Serial.print("Speed -: ");
+  Serial.println(usSpeed);
+}
+
+void motorGo(uint8_t motor, uint8_t direct, uint8_t pwm)         //Function that controls the variables: motor(0 or 1), direction (cw or ccw) and pwm (0 - 255);
+{
+  if(motor == MOTOR_KNEE)
+  {
+    if(direct == CW)
+    {
+      digitalWrite(MOTOR_A1_PIN, LOW); 
+      digitalWrite(MOTOR_B1_PIN, HIGH);
+    }
+    else if(direct == CCW)
+    {
+      digitalWrite(MOTOR_A1_PIN, HIGH);
+      digitalWrite(MOTOR_B1_PIN, LOW);      
+    }
+    else
+    {
+      digitalWrite(MOTOR_A1_PIN, LOW);
+      digitalWrite(MOTOR_B1_PIN, LOW);            
+    }
+    
+    analogWrite(PWM_MOTOR_KNEE, pwm); 
+  }
+  else if(motor == MOTOR_HIP)
+  {
+    if(direct == CW)
+    {
+      digitalWrite(MOTOR_A2_PIN, LOW);
+      digitalWrite(MOTOR_B2_PIN, HIGH);
+    }
+    else if(direct == CCW)
+    {
+      digitalWrite(MOTOR_A2_PIN, HIGH);
+      digitalWrite(MOTOR_B2_PIN, LOW);      
+    }
+    else
+    {
+      digitalWrite(MOTOR_A2_PIN, LOW);
+      digitalWrite(MOTOR_B2_PIN, LOW);            
+    }
+    
+    analogWrite(PWM_MOTOR_HIP, pwm);
+  }
+}
