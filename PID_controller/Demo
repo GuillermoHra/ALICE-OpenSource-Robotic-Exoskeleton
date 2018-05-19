@@ -1,0 +1,642 @@
+
+// Pediatric Exo Main code
+
+// TODO1: Define motors direction
+// TODO2: FSM code (Working on)
+// TODO3: Test gait cycle for each leg individually (put attention on the speed)
+// TODO4: Test PID for state transition (speed)
+// TODO5: Test full FSM (Both legs)
+// TODO6: Test joystick
+// TODO7: Check Motor direction in other leg (They are mechanically inverted)
+// Be aware of loss of absolute reference position (save values to restore them later)
+// Remove delay after Serialprints when testing is done
+
+
+//----PID------/////////////////////////////////////////////////
+#include <PID_v1.h>
+double setpoint;
+double input;
+double output;    //Default output goes from 0-255 (PWM values)
+double Kp=0, Ki=10, Kd=0;
+
+//create PID instance 
+PID myPID_direct(&input, &output, &setpoint, Kp, Ki, Kd, DIRECT);
+PID myPID_reverse(&input, &output, &setpoint, Kp, Ki, Kd, REVERSE);
+
+////////////////////////////////////////////////////////////////
+
+// Declarations for Monster Drivers
+#define BRAKE 0
+#define CW    1
+#define CCW   2
+#define CS_THRESHOLD 15   // Definition of safety current
+// MOTOR 1
+#define MOTOR_A1_PIN 7
+#define MOTOR_B1_PIN 8
+// MOTOR 2
+#define MOTOR_A2_PIN 4
+#define MOTOR_B2_PIN 9
+#define PWM_MOTOR_KNEE 5
+#define PWM_MOTOR_HIP 6
+#define CURRENT_SEN_KNEE A2
+#define CURRENT_SEN_HIP A3
+#define EN_PIN_KNEE A0
+#define EN_PIN_HIP A1
+#define MOTOR_KNEE 0  // Motor Knee
+#define MOTOR_HIP 1  // Motor Hip
+unsigned short usMotor_Status = BRAKE;
+short usSpeed=50;     // default motor speed = 150
+short delayMov=10;
+short delayReading = 10;
+short delayE = 20;
+short range = 10;
+char select_motor;
+uint8_t motor = 0;
+int serial = 0;
+int AnalogChannel = 13;
+int hipReading;
+int kneeReading;
+bool calibrated = true;
+bool valid=false;
+char user_input; 
+
+int hip_0degrees = 582;//565;
+int hip_10degrees = hip_0degrees+38;
+int hip_15degrees = hip_0degrees-45;
+int hip_30degrees = hip_15degrees-33;
+int knee_0degrees = 597;//614;
+int knee_30degrees = knee_0degrees-132;
+int knee_60degrees = knee_0degrees-224;
+
+  /*
+  int hip_0degrees = 565;
+int hip_10degrees = 603;
+int hip_15degrees = 520;
+int hip_30degrees = 488;
+int knee_0degrees = 614;
+int knee_30degrees = 482;
+int knee_60degrees = 390;
+  */
+  
+// Declarations for potentiometers
+#define POT_HIP A13 // Pot analog pin for right hip 
+#define POT_KNEE A14 // Pot analog pin for right knee
+
+void setup() {
+  // pinMode for monster drivers
+  pinMode(MOTOR_A1_PIN, OUTPUT);
+  pinMode(MOTOR_B1_PIN, OUTPUT);
+  pinMode(MOTOR_A2_PIN, OUTPUT);
+  pinMode(MOTOR_B2_PIN, OUTPUT);
+  pinMode(PWM_MOTOR_KNEE, OUTPUT);
+  pinMode(PWM_MOTOR_HIP, OUTPUT);
+  pinMode(CURRENT_SEN_KNEE, OUTPUT);
+  pinMode(CURRENT_SEN_HIP, OUTPUT);  
+  pinMode(EN_PIN_KNEE, OUTPUT);
+  pinMode(EN_PIN_HIP, OUTPUT);
+
+  /////////// PID Reverse////////////////
+  //Initial setpoint
+  setpoint = 75;
+  //Turn the PID on
+  myPID_reverse.SetMode(AUTOMATIC);
+  //Adjust PID values
+  myPID_reverse.SetTunings(Kp, Ki, Kd);
+  
+    /////////// PID Direct ////////////////
+  //Initial setpoint
+  setpoint = 75;
+  //Turn the PID on
+  myPID_direct.SetMode(AUTOMATIC);
+  //Adjust PID values
+  myPID_direct.SetTunings(Kp, Ki, Kd);
+  ////////////////////////////////
+  
+  // pinMode for potentiometers
+  pinMode(POT_HIP, INPUT); 
+  pinMode(POT_KNEE, INPUT); 
+
+  Serial.begin(9600);  
+  
+}
+
+void loop() {
+  digitalWrite(EN_PIN_KNEE, HIGH); // Enable Motor1
+  digitalWrite(EN_PIN_HIP, HIGH); // Enable Motor2
+  
+  while(user_input!='2')
+  {
+    DisplayMainMenu();
+    while(Serial.available() == 0){}
+    user_input = Serial.read(); //Read user input 
+    if(user_input=='0')
+    {
+      CalibrationRoutine();
+    }
+    else if (user_input=='1')
+    {
+      FSM();
+    }
+    else if (user_input=='2')
+    {
+      Serial.println("Gudbai");
+    }
+  }
+
+
+}
+
+
+void DisplayMainMenu()
+{   //////////////////////////////////////////////////
+  Serial.println("Enter number for routine selection:");
+  Serial.println("0. CALIBRATION");
+  Serial.println("1. GAIT");  
+  Serial.println("2. EXIT");  
+  Serial.println();
+}
+
+void DisplayMenu()
+{   //////////////////////////////////////////////////
+  Serial.println("Enter number for control option:");
+  Serial.println("1. STOP");
+  Serial.println("2. FORWARD");
+  Serial.println("3. REVERSE");
+  Serial.println("4. ANDALOG READ");
+  Serial.println("5. INCREASE DELAY");
+  Serial.println("6. DECREASE DELAY");
+  Serial.println("7. SAVE CALIBRATION");
+  Serial.println("8. READ CURRENT VALUES");
+  Serial.println("+. INCREASE SPEED");
+  Serial.println("-. DECREASE SPEED");
+  
+  Serial.println();
+}
+
+void MenuFunctions()
+{        
+     
+      while(Serial.available() == 0){}
+      user_input = Serial.read(); //Read user input 
+      if (user_input =='0' && calibrated==true)
+      {
+         Serial.println("Entering the calibration routine");
+         CalibrationRoutine();
+      }
+      else if (user_input =='1')
+      {
+         Stop(motor);
+      }
+      else if(user_input =='2')
+      {
+        Forward(motor, usSpeed);
+        delay(delayE);
+        Stop(motor);
+        delay(50);
+        Serial.println(analogRead(AnalogChannel));
+        delay(50);
+        
+      }
+      else if(user_input =='3')
+      {
+        Reverse(motor,usSpeed);
+        delay(delayE);
+        Stop(motor);
+        delay(50);
+        Serial.println(analogRead(AnalogChannel));
+      }
+      else if(user_input =='4')
+      {
+        Serial.println(analogRead(AnalogChannel));
+        delay(100);
+      }
+      else if(user_input =='5')
+      {
+        delayE=delayE+5;
+        Serial.println(delayE);
+      }
+      else if(user_input =='6')
+      {
+        delayE=delayE-5;
+        Serial.println(delayE);
+      }
+      else if(user_input =='7')
+      {
+        calibrated = true;
+      }
+      else if(user_input =='8')
+      {
+        Serial.println("Knee");
+        Serial.println(knee_0degrees);
+        Serial.println("Hip");
+        Serial.println(hip_0degrees);
+      }
+      else if(user_input =='+')
+      {
+        IncreaseSpeed();
+      }
+      else if(user_input =='-')
+      {
+        DecreaseSpeed();
+      }
+      else
+      {
+        Serial.println("Invalid option entered.");
+      }
+    
+}
+void SelectMotor()
+{
+  while(valid==false){
+  Serial.println("Enter number to select motor:");
+  Serial.println("1. Motor Hip");
+  Serial.println("2. Motor Knee");
+   while(Serial.available() == 0){}
+   
+   select_motor = Serial.read();
+   if(select_motor == '1'){
+     motor = MOTOR_HIP; //Motor Hip
+     AnalogChannel = 13;
+     valid=true;
+     Serial.println("Motor hip selected");
+     Serial.println();
+   }
+   else if(select_motor == '2'){
+     motor = MOTOR_KNEE; //Motor Knee
+     AnalogChannel = 14;
+     valid=true;
+     Serial.println("Motor knee selected"); 
+     Serial.println();
+     
+   }
+   else{
+     valid=false;
+     Serial.println("Invalid option entered for motor selection.");
+     Serial.println();
+   } 
+ }
+}
+void CalibrationRoutine()
+{
+  while(user_input!='n' && user_input!='N')
+  {
+   valid=false;
+   calibrated=false;
+   SelectMotor();
+   DisplayMenu();
+   Serial.println("Press 7 when the calibration is done");
+   while(Serial.available() == 0){}
+   while (calibrated==false)
+   {
+       MenuFunctions();
+   }
+   if(select_motor == '1'){ //Motor Hip
+      hip_0degrees = analogRead(AnalogChannel);
+      hip_10degrees = hip_0degrees+38;
+      hip_15degrees = hip_0degrees-45;
+      hip_30degrees = hip_15degrees-33;
+      
+   }
+   else if(select_motor == '2'){ //Motor Knee
+      knee_0degrees = analogRead(AnalogChannel);
+      knee_30degrees = knee_0degrees-132;
+      knee_60degrees = knee_30degrees-92;
+   }
+   
+   Serial.println("Calibration saved!");
+   Serial.println("Do you want to do another calibration (y/n)?");
+   while(Serial.available() == 0){}
+   user_input = Serial.read();
+  }
+  
+}
+
+// Functions
+void Stop(int motor)
+{
+  usMotor_Status = BRAKE;
+  motorGo(motor, usMotor_Status, 0);
+}
+
+void Forward(int motor, short usSpeed)
+{
+  usMotor_Status = CCW;
+  motorGo(motor, usMotor_Status, usSpeed);
+}
+
+void Reverse(int motor, short usSpeed)
+{
+  usMotor_Status = CW;
+  motorGo(motor, usMotor_Status, usSpeed);
+}
+
+void IncreaseSpeed()
+{
+  usSpeed = usSpeed + 10;
+  if(usSpeed > 255)
+  {
+    usSpeed = 255;  
+  }
+  
+  Serial.print("Speed +: ");
+  Serial.println(usSpeed);
+}
+
+void DecreaseSpeed()
+{
+  usSpeed = usSpeed - 10;
+  if(usSpeed < 0)
+  {
+    usSpeed = 0;  
+  }
+  
+  Serial.print("Speed -: ");
+  Serial.println(usSpeed);
+}
+
+void motorGo(uint8_t motor, uint8_t direct, uint8_t pwm) // Function that controls the variables: motor(0 or 1), direction (cw or ccw) and pwm (0 - 255);
+{
+  if(motor == MOTOR_KNEE)
+  {
+    if(direct == CW)
+    {
+      digitalWrite(MOTOR_A1_PIN, LOW); 
+      digitalWrite(MOTOR_B1_PIN, HIGH);
+    }
+    else if(direct == CCW)
+    {
+      digitalWrite(MOTOR_A1_PIN, HIGH);
+      digitalWrite(MOTOR_B1_PIN, LOW);      
+    }
+    else
+    {
+      digitalWrite(MOTOR_A1_PIN, LOW);
+      digitalWrite(MOTOR_B1_PIN, LOW);            
+    }
+    
+    analogWrite(PWM_MOTOR_KNEE, pwm); 
+  }
+  else if(motor == MOTOR_HIP)
+  {
+    if(direct == CW)
+    {
+      digitalWrite(MOTOR_A2_PIN, LOW);
+      digitalWrite(MOTOR_B2_PIN, HIGH);
+    }
+    else if(direct == CCW)
+    {
+      digitalWrite(MOTOR_A2_PIN, HIGH);
+      digitalWrite(MOTOR_B2_PIN, LOW);      
+    }
+    else
+    {
+      digitalWrite(MOTOR_A2_PIN, LOW);
+      digitalWrite(MOTOR_B2_PIN, LOW);            
+    }
+    
+    analogWrite(PWM_MOTOR_HIP, pwm);
+  }
+}
+
+
+void FSM()
+{
+  myPID_reverse.SetSampleTime(30); //Sample time in milliseconds
+  myPID_direct.SetSampleTime(30); //Sample time in milliseconds
+  /* FSM
+  MIDSTANCE
+  PRE-SWING
+  MID-SWING
+  TERMINAL-SWING
+ 
+  Right hip: (30° - (470-505)), (-10° - (598-608)), (15° - (514-526)), (0° - (560-569)) Valor disminuye(ángulo aumenta), Valor aumenta(ángulo disminuye)
+  Right knee: (-60° - (385-395)), (0° - (611-616)), (-30° - (478-485)) Valor disminuye(ángulo disminuye), Valor aumenta(ángulo aumenta)
+   
+  Left hip: (30° - (527-542)), (-10° - (595-605)), (15° - ()), (0° - ())
+  Left knee: (-60° - (601-607)), (0° - (474-481)), (-30° - ()) For left knee 0° are 15° due to mechanical failure
+  */
+  
+  /*
+  int hip_0degrees = 565;
+  int hip_10degrees = 603;
+  int hip_15degrees = 520;
+  int hip_30degrees = 488;
+  int knee_0degrees = 614;
+  int knee_30degrees = 482;
+  int knee_60degrees = 390;
+  */
+  Serial.println("Let's walk!");
+  delay(1000);
+  Serial.println("Get ready");
+  delay(3000);
+
+  // HIP AND KNEE TO 0°
+  Serial.println("Hip and Knee to 0°");
+  delay(100);
+  hipReading = analogRead(POT_HIP);
+  while((hipReading < (hip_0degrees-range)) || (hipReading > (hip_0degrees+range))){
+    // Move reverse
+    if (hipReading < (hip_0degrees-range)){      
+      while(hipReading < (hip_0degrees-range)){
+        Reverse(MOTOR_HIP, usSpeed);
+        delay(delayMov);
+        hipReading = analogRead(POT_HIP);
+      }
+      Stop(MOTOR_HIP);      
+    }
+    
+    // Move forward
+    if (hipReading > (hip_0degrees+range)){
+      while(hipReading > (hip_0degrees+range)){
+        Forward(MOTOR_HIP, usSpeed);
+        delay(delayMov);
+        hipReading = analogRead(POT_HIP);
+      }
+      Stop(MOTOR_HIP);
+    }
+  }
+  
+  //Knee to 0°
+  kneeReading = analogRead(POT_KNEE);
+  while((kneeReading < (knee_0degrees-range)) || (kneeReading > (knee_0degrees+range))){
+    // Move forward
+    if (kneeReading < (knee_0degrees-range)){      
+      while(kneeReading < (knee_0degrees-range)){
+        Forward(MOTOR_KNEE, usSpeed);
+        delay(delayMov);
+        kneeReading = analogRead(POT_KNEE);
+      }
+      Stop(MOTOR_KNEE);
+    }
+    
+    // Move reverse
+    if (kneeReading > (knee_0degrees+range)){      
+      while(kneeReading > (knee_0degrees+range)){
+        Reverse(MOTOR_KNEE, usSpeed);
+        delay(delayMov);
+        kneeReading = analogRead(POT_KNEE);
+      }
+      Stop(MOTOR_KNEE);
+    }
+    delay(200); 
+  }
+  Serial.println("Hip and Knee to 0° done");
+  delay(100); 
+  Serial.println("Knee");
+  Serial.println(kneeReading);
+  delay(100);
+  Serial.println("Hip");
+  Serial.println(hipReading);
+  delay(100);
+
+  // INITIAL SWING: HIP:0°, KNEE:0->(-60°)
+  Serial.println("Initial Swing");
+  delay(1000);
+  
+   Kp=0.2727;
+   Ki=0.244;
+   Kd=0;
+  myPID_reverse.SetTunings(Kp, Ki, Kd);
+  input = analogRead(POT_KNEE);
+  setpoint = knee_60degrees+40;
+  while( input > (setpoint)){
+    myPID_reverse.Compute();
+    Reverse(MOTOR_KNEE, output);
+    delay(delayMov);
+    input = analogRead(POT_KNEE);
+    // PID: Reduce speed when approaching the specified angle 
+  }
+  Stop(MOTOR_KNEE);
+  
+  Serial.println("Initial Swing Done");
+  Serial.println("Knee");
+  Serial.println(input);
+  delay(100);
+    
+    
+  // MID-SWING: HIP:0->15°, KNEE:(-60°)->(-30°)
+   Kp=0.4478;
+   Ki=0.275;
+   Kd=0;
+   myPID_reverse.SetTunings(Kp, Ki, Kd);
+   input = analogRead(POT_HIP);
+   setpoint = hip_15degrees+20;
+   while( input > (setpoint)){
+    myPID_reverse.Compute();
+    if(output<20)
+      output=20;
+    Forward(MOTOR_HIP, output);
+    delay(delayMov);
+    input = analogRead(POT_HIP);
+  }
+  Stop(MOTOR_HIP);
+  Serial.println("--------------");
+  Serial.println("Hip");
+  Serial.println(input);
+  delay(100);
+  
+   Kp=0.2727;
+   Ki=0.244;
+   Kd=0;
+   myPID_direct.SetTunings(Kp, Ki, Kd);
+   input = analogRead(POT_KNEE);
+   setpoint = knee_30degrees;
+  while( input < (knee_30degrees)){
+    myPID_direct.Compute();
+    if(output<11)
+      output=11;
+    Forward(MOTOR_KNEE, output);
+    delay(delayMov);
+    input = analogRead(POT_KNEE);
+  }
+//  Stop(MOTOR_KNEE);
+  
+//  Serial.println("Knee");
+//  Serial.println(input);
+//  delay(100);
+//  
+//  delay(delayReading);
+//  Serial.println("Mid Swing Done");//Serial.println("Initial Swing done");
+//  Serial.println("---------");
+//  delay(100);    
+//  
+//  
+//  // TERMINAL SWING: HIP:15°->30°, KNEE:(-30°)->0°
+//  Serial.println("Terminal Swing");
+//  delay(100);
+//      //Rodilla 30-0
+//   Kp=0.2727;
+//   Ki=0.244;
+//   Kd=0;
+//  myPID_direct.SetTunings(Kp, Ki, Kd);
+  input = analogRead(POT_KNEE);
+  setpoint = knee_0degrees-20;   ///PRUEBA
+  while( input < (setpoint)){
+    myPID_direct.Compute();
+    if(output<11)
+      output=11;
+    Forward(MOTOR_KNEE, output);
+    delay(delayMov);
+    input = analogRead(POT_KNEE);
+  }
+  Stop(MOTOR_KNEE);
+  
+  Serial.println("Knee");
+  Serial.println(input);
+  delay(100);
+  
+  // HIP 15-30
+     Kp=0.4478;
+   Ki=0.275;
+   Kd=0;
+  myPID_reverse.SetTunings(Kp, Ki, Kd);
+  input = analogRead(POT_HIP);
+  setpoint = hip_30degrees;
+  while( input > (setpoint)){
+    myPID_reverse.Compute();
+    if(output<37)
+      output=37;
+    Forward(MOTOR_HIP, output);
+    delay(delayMov);
+    input = analogRead(POT_HIP);
+    
+  }
+  Stop(MOTOR_HIP);
+  
+  Serial.println("Hip");
+  Serial.println(input);
+  delay(100);
+  
+  Serial.println("Terminal Swing done");
+  Serial.println("--------");
+  delay(100);
+  
+  // MID-STANCE: HIP:30°->0°, KNEE:0°
+  Serial.println("Mid-Stance");
+  delay(100);
+   Kp=0.4478;
+   Ki=0.275;
+   Kd=0;
+  myPID_direct.SetTunings(Kp, Ki, Kd);
+  input = analogRead(POT_HIP);
+  setpoint = hip_0degrees-55;
+  while( input < (setpoint)){
+    myPID_direct.Compute();
+    if(output>50)
+      output=50;
+    Reverse(MOTOR_HIP, output);
+    delay(delayMov);
+    input = analogRead(POT_HIP);
+  }
+  Stop(MOTOR_HIP);
+  Serial.println("Hip");
+  Serial.println(input);
+  delay(100);
+  Serial.println("Mid-Stance done");
+  Serial.println("----------------");
+  delay(100);  
+  
+  Serial.println("FSM Done");
+  delay(100);
+  Serial.println();
+}
